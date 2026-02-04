@@ -1,4 +1,3 @@
-```
 # subcalc
 
 **subcalc** is a lightweight, terminal-based subnet calculator written in Bash.  
@@ -18,7 +17,7 @@ Perfect for CCNA students, network engineers, and anyone who needs fast subnet m
 - Random private network example when calculating from hosts
 - Colorful, readable output
 - Zero external dependencies (pure Bash)
-```
+
 
 ## Installation
 
@@ -55,7 +54,9 @@ subcalc 120
 
 # Full subnet details
 subcalc 192.168.10.45 /27
+
 subcalc 10.1.2.3 255.255.255.192
+
 subcalc 172.16.5.100 255.255.252.0
 
 # CIDR shorthand
@@ -81,7 +82,3 @@ Binary mask         : 11111111.11111111.11111111.10000000
 Hex mask            : FF.FF.FF.80
 -----------------------------------
 Usage example: subcalc 10.145.78.0 /25
-
-## Requirements
-Bash (any modern version should work)
-No additional packages required
