@@ -45,8 +45,11 @@ subcalc 28
 
 ## Usage
 subcalc (number of hosts)
+
 subcalc (IP mask)
+
 subcalc (IP/mask)
+
 
 ## Examples
 Calculate mask for 120 hosts
