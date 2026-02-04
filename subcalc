@@ -1,0 +1,297 @@
+#!/usr/bin/env bash
+
+# =============================================================================
+#  SUBNET-CALC - CCNA-friendly tool for quick subnet calculations
+# =============================================================================
+
+# Colors for visual output (compatible with most terminals)
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Help and usage
+# ──────────────────────────────────────────────────────────────────────────────
+
+usage() {
+    echo -e "${YELLOW}Usage:${NC}"
+    echo "  ${0##*/} <number of hosts>                  → Calculate optimal subnet mask for X hosts"
+    echo "  ${0##*/} <IP> <mask>                        → Calculate full subnet details (mask decimal or /CIDR)"
+    echo "  ${0##*/} <IP/mask>                          → Calculate subnet (CIDR notation)"
+    echo ""
+    echo -e "${BLUE}Supported formats:${NC}"
+    echo "  • IP/Mask: decimal (192.168.1.1), binary (11000000.10101000.00000001.00000001 or without dots), hex (C0.A8.01.01 or C0A80101)"
+    echo "  • Mask: decimal (255.255.255.0), /24, binary, hex"
+    echo ""
+    echo -e "${BLUE}Examples:${NC}"
+    echo "  ${0##*/} 500"
+    echo "  ${0##*/} 192.168.10.0 255.255.255.128"
+    echo "  ${0##*/} 10.1.2.3/26"
+    echo "  ${0##*/} 11000000101010000000101000000011 /27"
+    echo "  ${0##*/} C0A80A00 FFFFFFE0"
+    echo ""
+    exit 1
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Conversion functions (reusable and optimized)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Parse any input (decimal, binary, hex, with/without dots) to decimal octets array
+parse_to_octets() {
+    local input="$1"
+    local octets=()
+
+    if [[ "$input" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        # Decimal with dots
+        IFS='.' read -ra octets <<< "$input"
+    elif [[ "$input" =~ ^[0-9A-Fa-f]{2}\.[0-9A-Fa-f]{2}\.[0-9A-Fa-f]{2}\.[0-9A-Fa-f]{2}$ ]]; then
+        # Hex with dots
+        IFS='.' read -ra parts <<< "$input"
+        for p in "${parts[@]}"; do octets+=("$((16#${p^^}))"); done
+    elif [[ "$input" =~ ^[0-9A-Fa-f]{8}$ ]]; then
+        # Hex continuous
+        octets=("$((16#${input:0:2}))" "$((16#${input:2:2}))" "$((16#${input:4:2}))" "$((16#${input:6:2}))")
+    elif [[ "$input" =~ ^[01]{8}\.[01]{8}\.[01]{8}\.[01]{8}$ ]]; then
+        # Binary with dots
+        IFS='.' read -ra parts <<< "$input"
+        for p in "${parts[@]}"; do octets+=("$((2#$p))"); done
+    elif [[ "$input" =~ ^[01]{32}$ ]]; then
+        # Binary continuous
+        octets=("$((2#${input:0:8}))" "$((2#${input:8:8}))" "$((2#${input:16:8}))" "$((2#${input:24:8}))")
+    else
+        echo -e "${RED}Error: Invalid format for '$input'.${NC}" >&2
+        exit 1
+    fi
+
+    # Validate ranges (0-255 per octet)
+    for o in "${octets[@]}"; do
+        if (( o < 0 || o > 255 )); then
+            echo -e "${RED}Error: Invalid octet in '$input'.${NC}" >&2
+            exit 1
+        fi
+    done
+
+    echo "${octets[@]}"
+}
+
+# Convert octets to decimal IP
+octets_to_ip() {
+    local octets=("$@")
+    printf "%d.%d.%d.%d" "${octets[@]}"
+}
+
+# Convert octets to binary with dots (fixed with bit shifting)
+octets_to_bin() {
+    local octets=("$@")
+    local bin_str=""
+    for o in "${octets[@]}"; do
+        local bin_octet=""
+        for ((i=7; i>=0; i--)); do
+            bin_octet+="$(( (o >> i) & 1 ))"
+        done
+        bin_str+="${bin_octet}."
+    done
+    echo "${bin_str%.}"
+}
+
+# Convert octets to hex (with dots)
+octets_to_hex() {
+    local octets=("$@")
+    printf "%02X.%02X.%02X.%02X" "${octets[@]}"
+}
+
+# Calculate CIDR prefix from mask (count 1 bits)
+mask_to_cidr() {
+    local mask_octets=("$@")
+    local cidr=0
+    for o in "${mask_octets[@]}"; do
+        while (( o > 0 )); do
+            ((cidr += o & 1))
+            ((o >>= 1))
+        done
+    done
+    echo "$cidr"
+}
+
+# Calculate mask from CIDR
+cidr_to_mask_octets() {
+    local cidr=$1
+    local mask_octets=()
+    local full_octets=$((cidr / 8))
+    local partial_bits=$((cidr % 8))
+    local i
+
+    for ((i=0; i<full_octets; i++)); do
+        mask_octets[i]=255
+    done
+
+    if (( partial_bits > 0 )); then
+        mask_octets[i]=$(( (1 << partial_bits) - 1 << (8 - partial_bits) ))
+        ((i++))
+    fi
+
+    while (( i < 4 )); do
+        mask_octets[i]=0
+        ((i++))
+    done
+
+    echo "${mask_octets[@]}"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Mode 1: Calculate mask from number of hosts
+# ──────────────────────────────────────────────────────────────────────────────
+
+calc_from_hosts() {
+    local hosts=$1
+
+    if ! [[ "$hosts" =~ ^[0-9]+$ ]] || (( hosts < 1 )); then
+        echo -e "${RED}Error: Number of hosts must be a positive integer.${NC}" >&2
+        exit 1
+    fi
+
+    local bits_host=1
+    while (( (1 << bits_host) - 2 < hosts )); do
+        ((bits_host++))
+    done
+
+    local cidr=$((32 - bits_host))
+    local hosts_util=$(( (1 << bits_host) - 2 ))
+    local mask_octets=($(cidr_to_mask_octets $cidr))
+    local mask_ip=$(octets_to_ip "${mask_octets[@]}")
+    local mask_bin=$(octets_to_bin "${mask_octets[@]}")
+    local mask_hex=$(octets_to_hex "${mask_octets[@]}")
+
+    # Generate random private network example (class A, B, or C)
+    local example_net
+    local class=$((RANDOM % 3))
+    case $class in
+        0) # Class A: 10.x.x.0
+            example_net="10.$((RANDOM % 256)).$((RANDOM % 256)).0"
+            ;;
+        1) # Class B: 172.16-31.x.0
+            example_net="172.$((16 + RANDOM % 16)).$((RANDOM % 256)).0"
+            ;;
+        2) # Class C: 192.168.x.0
+            example_net="192.168.$((RANDOM % 256)).0"
+            ;;
+    esac
+
+    echo -e "${GREEN}Calculation for $hosts requested hosts:${NC}"
+    echo "-----------------------------------"
+    echo "Usable hosts        : $hosts_util"
+    echo "Host bits           : $bits_host"
+    echo "CIDR prefix         : /$cidr"
+    echo "Decimal mask        : $mask_ip"
+    echo "Binary mask         : $mask_bin"
+    echo "Hex mask            : $mask_hex"
+    echo "-----------------------------------"
+    echo -e "${BLUE}Usage example: ${0##*/} $example_net /$cidr${NC}"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Mode 2: Calculate full subnet from IP and mask
+# ──────────────────────────────────────────────────────────────────────────────
+
+calc_subnet() {
+    local ip_input="$1"
+    local mask_input="$2"
+
+    # Parse IP
+    local ip_octets=($(parse_to_octets "$ip_input"))
+
+    # Parse mask (can be /CIDR, decimal, binary, hex)
+    if [[ "$mask_input" =~ ^/[0-9]{1,2}$ ]]; then
+        mask_input="${mask_input#/}"
+        local cidr=$mask_input
+        local mask_octets=($(cidr_to_mask_octets $cidr))
+    else
+        local mask_octets=($(parse_to_octets "$mask_input"))
+        local cidr=$(mask_to_cidr "${mask_octets[@]}")
+    fi
+
+    # Validate valid mask (contiguous bits)
+    local mask_bin=$(octets_to_bin "${mask_octets[@]}")
+    mask_bin=${mask_bin//./}
+    if [[ ! "$mask_bin" =~ ^1{$cidr}0{$(($((32 - cidr))))}$ ]]; then
+        echo -e "${RED}Error: Invalid mask (non-contiguous bits).${NC}" >&2
+        exit 1
+    fi
+
+    # Calculate network ID: IP & mask
+    local net_octets=()
+    for i in {0..3}; do
+        net_octets[i]=$(( ${ip_octets[i]} & ${mask_octets[i]} ))
+    done
+
+    # Calculate broadcast: network | ~mask
+    local bc_octets=("${net_octets[@]}")
+    for i in {0..3}; do
+        bc_octets[i]=$(( ${bc_octets[i]} | (255 - ${mask_octets[i]}) ))
+    done
+
+    # First and last usable IP
+    local first_octets=("${net_octets[@]}")
+    ((first_octets[3]++))
+    local last_octets=("${bc_octets[@]}")
+    ((last_octets[3]--))
+
+    # Usable hosts
+    local hosts_util=$(( (1 << (32 - cidr)) - 2 ))
+
+    # Formats
+    local ip_bin=$(octets_to_bin "${ip_octets[@]}")
+    local ip_hex=$(octets_to_hex "${ip_octets[@]}")
+    local mask_bin=$(octets_to_bin "${mask_octets[@]}")
+    local mask_hex=$(octets_to_hex "${mask_octets[@]}")
+    local net_ip=$(octets_to_ip "${net_octets[@]}")
+    local first_ip=$(octets_to_ip "${first_octets[@]}")
+    local last_ip=$(octets_to_ip "${last_octets[@]}")
+    local bc_ip=$(octets_to_ip "${bc_octets[@]}")
+
+    echo -e "${GREEN}Subnet calculation for $(octets_to_ip "${ip_octets[@]}") /$cidr:${NC}"
+    echo "-----------------------------------"
+    echo "IP Address          : $(octets_to_ip "${ip_octets[@]}")"
+    echo "  Binary            : $ip_bin"
+    echo "  Hex               : $ip_hex"
+    echo "Mask                : $(octets_to_ip "${mask_octets[@]}") /$cidr"
+    echo "  Binary            : $mask_bin"
+    echo "  Hex               : $mask_hex"
+    echo "Network Address     : $net_ip"
+    echo "First Usable IP     : $first_ip"
+    echo "Last Usable IP      : $last_ip"
+    echo "Broadcast           : $bc_ip"
+    echo "Usable Hosts        : $hosts_util"
+    echo "-----------------------------------"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Main logic
+# ──────────────────────────────────────────────────────────────────────────────
+
+if [ $# -eq 0 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ] || [ "$1" = "help" ]; then
+    usage
+fi
+
+if [ $# -eq 1 ]; then
+    if [[ "$1" =~ ^[0-9]+$ ]]; then
+        # Hosts mode
+        calc_from_hosts "$1"
+    elif [[ "$1" =~ ^.*/[0-9]{1,2}$ ]]; then
+        # CIDR mode: IP/mask
+        local ip_part="${1%/*}"
+        local mask_part="/${1#*/}"
+        calc_subnet "$ip_part" "$mask_part"
+    else
+        echo -e "${RED}Error: Invalid argument.${NC}" >&2
+        usage
+    fi
+elif [ $# -eq 2 ]; then
+    # IP mask mode
+    calc_subnet "$1" "$2"
+else
+    usage
+fi
