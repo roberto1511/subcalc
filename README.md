@@ -49,20 +49,22 @@ subcalc <IP> <mask>
 subcalc <IP/mask>
 
 ## Examples
-# Calculate mask for 120 hosts
+Calculate mask for 120 hosts
+```
 subcalc 120
+```
 
-# Full subnet details
+## Full subnet details
 subcalc 192.168.10.45 /27
 
 subcalc 10.1.2.3 255.255.255.192
 
 subcalc 172.16.5.100 255.255.252.0
 
-# CIDR shorthand
+## CIDR shorthand
 subcalc 192.168.1.50/26
 
-# Binary and hex inputs
+## Binary and hex inputs
 subcalc 11000000101010000000101000110010 /27
 subcalc C0A80A32 FFFFFFE0
 
@@ -70,15 +72,3 @@ subcalc C0A80A32 FFFFFFE0
 subcalc --help
 subcalc -h
 subcalc help
-
-## Output Example
-Calculation for 120 requested hosts:
------------------------------------
-Usable hosts        : 126
-Host bits           : 7
-CIDR prefix         : /25
-Decimal mask        : 255.255.255.128
-Binary mask         : 11111111.11111111.11111111.10000000
-Hex mask            : FF.FF.FF.80
------------------------------------
-Usage example: subcalc 10.145.78.0 /25
