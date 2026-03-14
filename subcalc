@@ -189,7 +189,7 @@ calc_from_hosts() {
     echo "Binary mask         : $mask_bin"
     echo "Hex mask            : $mask_hex"
     echo "-----------------------------------"
-    echo -e "${BLUE}Usage example: ${0##*/} $example_net /$cidr${NC}"
+    echo -e "${BLUE}For subnet calculation run this command: ${0##*/} $example_net /$cidr${NC}"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
