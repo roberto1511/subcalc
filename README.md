@@ -23,7 +23,6 @@ Perfect for CCNA students, network engineers, and anyone who needs fast subnet m
 
 1. Clone the repository:
 ```
-bash
 git clone https://github.com/roberto1511/subcalc.git
 cd subcalc
 ```
