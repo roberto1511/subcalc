@@ -5,7 +5,7 @@ It helps you quickly calculate subnet masks from required hosts, or get full sub
 
 Perfect for CCNA students, network engineers, and anyone who needs fast subnet math without leaving the terminal.
 
-## Features
+### Features
 
 - Calculate optimal subnet mask (/CIDR, decimal, binary, hex) from number of required hosts
 - Compute full subnet information: network address, first/last usable IP, broadcast, usable hosts count
@@ -19,12 +19,12 @@ Perfect for CCNA students, network engineers, and anyone who needs fast subnet m
 - Zero external dependencies (pure Bash)
 
 
-## Installation
+### Installation
 
 1. Clone the repository:
 ```
 bash
-git clone https://github.com/YOUR_USERNAME/subcalc.git
+git clone https://github.com/roberto1511/subcalc.git
 cd subcalc
 ```
 
@@ -43,7 +43,7 @@ Now you can run it from anywhere:
 subcalc 28
 ```
 
-## Usage
+### Usage
 subcalc (number of hosts)
 
 subcalc (IP mask)
@@ -51,27 +51,27 @@ subcalc (IP mask)
 subcalc (IP/mask)
 
 
-## Examples
+### Examples
 Calculate mask for 120 hosts
 ```
 subcalc 120
 ```
 
-## Full subnet details
+Full subnet details
 subcalc 192.168.10.45 /27
 
 subcalc 10.1.2.3 255.255.255.192
 
 subcalc 172.16.5.100 255.255.252.0
 
-## CIDR shorthand
+CIDR shorthand
 subcalc 192.168.1.50/26
 
-## Binary and hex inputs
+Binary and hex inputs
 subcalc 11000000101010000000101000110010 /27
 subcalc C0A80A32 FFFFFFE0
 
-## Show help:
+Show help:
 subcalc --help
 subcalc -h
 subcalc help
