@@ -36,11 +36,7 @@ sudo chmod +x subcalc
 ```
 sudo mv subcalc /usr/local/bin/
 ```
-Now you can run it from anywhere:
-
-```
-subcalc 28
-```
+Now you can run it from anywhere.
 
 ### Usage
 subcalc (number of hosts)
@@ -48,27 +44,6 @@ subcalc (number of hosts)
 subcalc (IP mask)
 
 subcalc (IP/mask)
-
-
-### Examples
-Calculate mask for 120 hosts
-```
-subcalc 120
-```
-
-Full subnet details
-subcalc 192.168.10.45 /27
-
-subcalc 10.1.2.3 255.255.255.192
-
-subcalc 172.16.5.100 255.255.252.0
-
-CIDR shorthand
-subcalc 192.168.1.50/26
-
-Binary and hex inputs
-subcalc 11000000101010000000101000110010 /27
-subcalc C0A80A32 FFFFFFE0
 
 Show help:
 subcalc --help
