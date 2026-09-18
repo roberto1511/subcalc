@@ -1,6 +1,6 @@
 # subcalc
 
-**subcalc** is a lightweight, terminal-based subnet calculator written in Bash.  
+Is a lightweight, terminal-based subnet calculator written in Bash.  
 It helps you quickly calculate subnet masks from required hosts, or get full subnet details (network ID, usable IPs, broadcast, etc.) from an IP and mask.
 
 ### Installation
